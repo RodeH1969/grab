@@ -5,7 +5,11 @@ const path       = require('path');
 
 const app    = express();
 const server = http.createServer(app);
-const io     = new Server(server, { cors: { origin: '*' } });
+const io = new Server(server, {
+  cors: { origin: '*' },
+  transports: ['websocket'],
+  allowUpgrades: false,
+});
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -284,13 +288,29 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     const roomId = socket.roomId;
     if(!roomId || !rooms[roomId]) return;
-    const other = getOther(rooms[roomId], socket.id);
-    if(other) io.to(other.socketId).emit('opponent_left');
-    delete rooms[roomId];
-    console.log(`Room ${roomId} closed`);
+    const room = rooms[roomId];
+
+    // If game not started yet and only 1 player, just clean up silently
+    // Give 30 seconds grace period for reconnection before closing room
+    setTimeout(() => {
+      if(!rooms[roomId]) return;
+      const other = getOther(rooms[roomId], socket.id);
+      if(other) io.to(other.socketId).emit('opponent_left');
+      delete rooms[roomId];
+      console.log(`Room ${roomId} closed`);
+    }, room.phase === 'waiting' ? 0 : 30000);
   });
 
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`GRAB server on port ${PORT}`));
+
+// Keepalive — prevent Render from sleeping
+const https = require('https');
+setInterval(() => {
+  const host = process.env.RENDER_EXTERNAL_URL;
+  if(host){
+    https.get(host, ()=>{}).on('error', ()=>{});
+  }
+}, 840000); // ping every 14 minutes

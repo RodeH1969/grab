@@ -735,7 +735,15 @@ function doGrab(){
 
 // ── SOCKET ──
 function connectSocket(){
-  socket=io();
+  socket=io({
+    transports: ['websocket'],
+    upgrade: false,
+    reconnection: true,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 2000,
+    reconnectionDelayMax: 10000,
+    timeout: 30000,
+  });
 
   socket.on('game_ready',data=>{
     mySocketId=data.mySocketId;myName=data.myName;oppNameVal=data.oppName;
