@@ -9,7 +9,8 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 :root{--blue:#003087;--red:#e30613;--gold:#ffd700;}
-html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nunito',sans-serif;touch-action:none;user-select:none;perspective:1000px;}
+html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nunito',sans-serif;touch-action:none;user-select:none;}
+#app,#reshuffle,#lobby{perspective:1000px;transform-style:preserve-3d;}
 
 /* ── GAME SCREEN ── */
 #app{
@@ -644,16 +645,16 @@ function flyCard(productId, fromEl, cb){
     el.style.left=dx+'px';el.style.top=dy+'px';el.style.transform=`rotate(${rot}deg)`;
   });
   setTimeout(()=>{
-    el.style.transition='transform 0.12s ease';
-    el.style.transform=`rotate(${rot}deg) rotateY(90deg)`;
+    el.style.transition='transform 0.14s cubic-bezier(0.3,0,0.2,1)';
+    el.style.transform=`rotate(${rot}deg) rotateY(90deg) rotateX(15deg) scale(1.05)`;
     setTimeout(()=>{
       img.src=PM[productId]?.img||'grab.png';
       el.style.background='#fff';
       requestAnimationFrame(()=>{
-        el.style.transition='transform 0.12s ease';
-        el.style.transform=`rotate(${rot}deg) rotateY(0deg)`;
+        el.style.transition='transform 0.14s cubic-bezier(0.3,0,0.2,1)';
+        el.style.transform=`rotate(${rot}deg) rotateY(0deg) rotateX(0deg) scale(1)`;
       });
-      setTimeout(()=>{document.body.removeChild(el);cb();},130);
+      setTimeout(()=>{document.body.removeChild(el);cb();},140);
     },120);
   },210);
 }
@@ -804,6 +805,7 @@ function sndShuffle(){
 // ── MATCH ALERT ──
 function clearMatchGlow(){
   document.getElementById('pile-area').classList.remove('match-glow');
+  document.getElementById('ticker-track').style.animationDuration='40s';
 }
 
 function showDeckEmpty(){
@@ -939,7 +941,7 @@ function doFlip(){
   socket.emit('flip');
 }
 function doGrab(){
-  if(animating)return;
+  if(animating||pile.length===0)return;
   socket.emit('grab');
 }
 
@@ -991,6 +993,7 @@ function connectSocket(){
       if(data.isMatch){
         matchOnPile=true;
         document.getElementById('pile-area').classList.add('match-glow');
+        document.getElementById('ticker-track').style.animationDuration='8s';
       }
       isMyTurn=data.newTurn===mySocketId;
       animating=false;updateUI();
