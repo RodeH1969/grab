@@ -9,7 +9,7 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 :root{--blue:#003087;--red:#e30613;--gold:#ffd700;}
-html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nunito',sans-serif;touch-action:none;user-select:none;}
+html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nunito',sans-serif;touch-action:none;user-select:none;perspective:1000px;}
 
 /* ── GAME SCREEN ── */
 #app{
@@ -130,12 +130,13 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nu
   font-family:'Bebas Neue',sans-serif;
   font-size:22px;letter-spacing:2px;
   cursor:pointer;
-  transition:transform 0.1s,opacity 0.2s;
+  transition:transform 0.05s,box-shadow 0.05s,opacity 0.2s;
 }
-#btn-flip{background:var(--blue);color:#fff;box-shadow:0 3px 10px rgba(0,48,135,0.35);}
+#btn-flip{background:var(--blue);color:#fff;box-shadow:0 4px 0 rgba(0,24,90,0.6),0 3px 10px rgba(0,48,135,0.35);}
 #btn-flip:disabled{opacity:0.3;box-shadow:none;}
-#btn-grab{background:var(--red);color:#fff;box-shadow:0 3px 10px rgba(227,6,19,0.35);}
-.gbtn:active:not(:disabled){transform:scale(0.94);}
+#btn-grab{background:var(--red);color:#fff;box-shadow:0 4px 0 rgba(120,0,0,0.5),0 3px 10px rgba(227,6,19,0.35);}
+#btn-flip:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 3px rgba(0,48,135,0.2);}
+#btn-grab:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 3px rgba(227,6,19,0.2);}
 
 /* TICKER */
 #ticker{
@@ -216,6 +217,14 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nu
 #confetti.show{display:block;}
 .cf{position:absolute;border-radius:2px;opacity:0;animation:cfall 1.1s ease-in forwards;}
 @keyframes cfall{0%{opacity:1;transform:translateY(-10px) rotate(0)}100%{opacity:0;transform:translateY(100vh) rotate(720deg)}}
+
+.shake{animation:shakeMe 0.35s cubic-bezier(.36,.07,.19,.97) both;}
+@keyframes shakeMe{
+  10%,90%{transform:translate3d(-2px,0,0);}
+  20%,80%{transform:translate3d(3px,0,0);}
+  30%,50%,70%{transform:translate3d(-5px,0,0);}
+  40%,60%{transform:translate3d(5px,0,0);}
+}
 
 
 #pile-area.match-glow .pcrd:last-child{
@@ -508,13 +517,16 @@ function sndSlide(){
 function sndGrab(){
   try{
     const ctx=ac();
-    [200,320,440,560,680].forEach((fr,i)=>{
+    const now=ctx.currentTime;
+    [440,554.37,659.25,880].forEach((freq,idx)=>{
       const o=ctx.createOscillator(),g=ctx.createGain();
-      o.frequency.value=fr;o.type='square';
-      g.gain.setValueAtTime(0.12,ctx.currentTime+i*0.055);
-      g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+i*0.055+0.22);
+      o.type='triangle';
+      o.frequency.setValueAtTime(freq,now);
+      o.frequency.exponentialRampToValueAtTime(freq*1.2,now+0.15);
+      g.gain.setValueAtTime(0.15,now);
+      g.gain.exponentialRampToValueAtTime(0.001,now+0.4+(idx*0.05));
       o.connect(g);g.connect(ctx.destination);
-      o.start(ctx.currentTime+i*0.055);o.stop(ctx.currentTime+i*0.055+0.22);
+      o.start(now);o.stop(now+0.5);
     });
   }catch(e){}
 }
@@ -630,7 +642,11 @@ function resolveGrab(grabbedBy, grabberName, isMatch, pileSize, newTurn){
   animating=true;btnFlip.disabled=true;
   const iWon=isMatch?(grabbedBy===mySocketId):(grabbedBy!==mySocketId);
   const toStack=iWon?playerStack:oppStack;
-  if(isMatch){sndGrab();showConfetti();}else{sndFalse();}
+  if(isMatch){sndGrab();showConfetti();}else{
+    sndFalse();
+    document.body.classList.add('shake');
+    setTimeout(()=>document.body.classList.remove('shake'),400);
+  }
   popupIcon.textContent=isMatch?'🛒':'😬';
   popupTitle.textContent=isMatch?'GRABBED!':'FALSE GRAB!';
   popupMsg.textContent=isMatch?`${grabberName} was too fast on that one`:`${grabberName} got too jumpy on that one`;
@@ -654,7 +670,13 @@ function showBaro(iWon,pileSize,finalCount,newTurn){
   baroWrap.classList.add('show');
   let cur=start;
   const step=Math.ceil(pileSize/16);
-  const t=setInterval(()=>{cur=Math.min(cur+step,finalCount);baroCount.textContent=cur;if(cur>=finalCount)clearInterval(t);},55);
+  const t=setInterval(()=>{
+    cur=Math.min(cur+step,finalCount);
+    baroCount.textContent=cur;
+    baroCount.style.transform='scale(1.2)';
+    setTimeout(()=>{baroCount.style.transform='scale(1)';},30);
+    if(cur>=finalCount)clearInterval(t);
+  },55);
   setTimeout(()=>{
     baroWrap.classList.remove('show');
     isMyTurn=newTurn===mySocketId;
@@ -675,6 +697,22 @@ function showConfetti(){
     confetti.appendChild(c);
   }
   setTimeout(()=>{confetti.classList.remove('show');confetti.innerHTML='';},1800);
+}
+
+function sndYourTurn(){
+  try{
+    const ctx=ac();
+    const now=ctx.currentTime;
+    [0,0.12].forEach(delay=>{
+      const o=ctx.createOscillator(),g=ctx.createGain();
+      o.frequency.setValueAtTime(60,now+delay);
+      o.frequency.exponentialRampToValueAtTime(30,now+delay+0.1);
+      g.gain.setValueAtTime(0.4,now+delay);
+      g.gain.exponentialRampToValueAtTime(0.001,now+delay+0.1);
+      o.connect(g);g.connect(ctx.destination);
+      o.start(now+delay);o.stop(now+delay+0.12);
+    });
+  }catch(e){}
 }
 
 function sndShuffle(){
@@ -785,9 +823,11 @@ function connectSocket(){
       renderPile();bump();
       if(data.isMatch){
         matchOnPile=true;
+        document.getElementById('pile-area').classList.add('match-glow');
       }
       isMyTurn=data.newTurn===mySocketId;
       animating=false;updateUI();
+      if(isMyTurn) sndYourTurn();
     });
   });
 
@@ -816,6 +856,7 @@ function connectSocket(){
     isMyTurn = data.turn === mySocketId;
     animating = false;
     updateUI();
+    if(isMyTurn) sndYourTurn();
   });
 }
 
