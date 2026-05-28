@@ -169,11 +169,14 @@ io.on('connection', (socket) => {
     if(!room || room.phase !== 'playing') return;
     // Must be this player's turn
     if(room.turn !== socket.id) return;
-    // If this player has no cards, skip their turn to the other player
+    // If this player has no cards, pass turn to other player
     const hand = room.hands[socket.id];
     if(!hand || !hand.length){
       const other = getOther(room, socket.id);
-      if(other) room.turn = other.socketId;
+      if(other){
+        room.turn = other.socketId;
+        io.to(socket.roomId).emit('turn_change', { turn: room.turn });
+      }
       return;
     }
 
@@ -267,25 +270,31 @@ io.on('connection', (socket) => {
       },
     });
 
-    // Check win condition — only end if loser has zero cards after losing a correct grab
-    const p0Hand = room.hands[room.players[0].socketId];
-    const p1Hand = room.hands[room.players[1].socketId];
+    const p0 = room.players[0];
+    const p1 = room.players[1];
+    const p0Hand = room.hands[p0.socketId];
+    const p1Hand = room.hands[p1.socketId];
+    const grabberHand  = room.hands[grabber.socketId];
+    const otherHand    = room.hands[other.socketId];
 
     if(isMatch){
       // Correct grab — check if loser now has zero cards
-      const loserSocketId = grabber.socketId === room.players[0].socketId
-        ? room.players[1].socketId
-        : room.players[0].socketId;
-      const loserHand = room.hands[loserSocketId];
-      if(loserHand.length === 0){
+      if(otherHand.length === 0){
         io.to(socket.roomId).emit('game_over', { winner: grabber.name });
+        return;
+      }
+    } else {
+      // False grab — check if grabber had zero cards = instant game over
+      // grabberHand already had pile added to other, so check if grabber has zero
+      if(grabberHand.length === 0){
+        io.to(socket.roomId).emit('game_over', { winner: other.name });
         return;
       }
     }
 
-    // If one player has no cards, the other must keep flipping regardless of turn
-    if(p0Hand.length === 0) room.turn = room.players[1].socketId;
-    if(p1Hand.length === 0) room.turn = room.players[0].socketId;
+    // If one player has no cards, the other keeps flipping
+    if(p0Hand.length === 0) room.turn = p1.socketId;
+    if(p1Hand.length === 0) room.turn = p0.socketId;
 
     // Unlock after animations complete
     setTimeout(() => { room.grabLocked = false; }, 3500);

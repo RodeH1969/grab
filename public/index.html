@@ -806,6 +806,12 @@ function connectSocket(){
   });
 
   socket.on('opponent_left',()=>{ D('opp-left').classList.add('show'); });
+
+  socket.on('turn_change', data=>{
+    isMyTurn = data.turn === mySocketId;
+    animating = false;
+    updateUI();
+  });
 }
 
 // ── LOBBY ──
