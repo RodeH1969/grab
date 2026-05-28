@@ -812,18 +812,33 @@ function startChallenge(){
   const name=D('name-in').value.trim();
   if(!name){D('name-in').focus();return;}
   myName=name;playerNameEl.textContent=name;
+
+  // Trigger share IMMEDIATELY on user gesture before any async call
+  // Generate a placeholder link first, update after room created
+  const baseLink=window.location.origin+window.location.pathname+'?room=LOADING';
+
   connectSocket();
   socket.emit('create_room',{name},res=>{
     roomId=res.roomId;
     const link=window.location.origin+window.location.pathname+'?room='+roomId;
     D('btn-challenge').style.display='none';D('name-in').style.display='none';
     D('lobby-status').textContent='Waiting for opponent...';
-    if(navigator.share){
-      navigator.share({title:'GRAB',text:myName+' is challenging you to GRAB!',url:link});
-    } else {
-      navigator.clipboard?.writeText(link);
-      D('lobby-status').textContent='Link copied! Waiting for opponent...';
-    }
+    // Show copy button since share must be user-gesture triggered
+    const copyBtn=document.createElement('button');
+    copyBtn.className='lbtn';
+    copyBtn.style.background='#16a34a';
+    copyBtn.style.marginTop='0';
+    copyBtn.textContent='COPY INVITE LINK';
+    copyBtn.onclick=()=>{
+      if(navigator.share){
+        navigator.share({title:'GRAB',text:myName+' is challenging you to GRAB!',url:link});
+      } else {
+        navigator.clipboard?.writeText(link);
+        copyBtn.textContent='LINK COPIED!';
+        setTimeout(()=>{copyBtn.textContent='COPY INVITE LINK';},2000);
+      }
+    };
+    D('lobby').appendChild(copyBtn);
   });
 }
 
