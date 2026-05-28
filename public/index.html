@@ -24,11 +24,23 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nu
 /* Title */
 #title{
   font-family:'Bebas Neue',sans-serif;
-  font-size:28px;letter-spacing:5px;
+  font-size:32px;letter-spacing:5px;
   color:var(--blue);
-  padding:6px 0 2px;
+  padding:4px 0 0;
   flex-shrink:0;
   line-height:1;
+  text-align:center;
+}
+#title-sub{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:13px;letter-spacing:3px;
+  background:var(--red);
+  color:#fff;
+  padding:2px 10px;
+  border-radius:4px;
+  display:inline-block;
+  margin-top:3px;
+  line-height:1.4;
 }
 
 /* Player rows */
@@ -194,6 +206,43 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nu
 .cf{position:absolute;border-radius:2px;opacity:0;animation:cfall 1.1s ease-in forwards;}
 @keyframes cfall{0%{opacity:1;transform:translateY(-10px) rotate(0)}100%{opacity:0;transform:translateY(100vh) rotate(720deg)}}
 
+/* MATCH FLASH */
+#match-flash{
+  display:none;position:fixed;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%) scale(0.5);
+  background:var(--red);color:#fff;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:48px;letter-spacing:4px;
+  padding:14px 32px;border-radius:16px;
+  z-index:750;pointer-events:none;
+  box-shadow:0 8px 32px rgba(227,6,19,0.6);
+}
+#match-flash.show{
+  display:block;
+  animation:matchpop 0.25s cubic-bezier(0.34,1.56,0.64,1) forwards;
+}
+@keyframes matchpop{
+  from{transform:translate(-50%,-50%) scale(0.3);opacity:0;}
+  to{transform:translate(-50%,-50%) scale(1);opacity:1;}
+}
+#pile-area.match-glow .pcrd:last-child{
+  box-shadow:0 0 0 4px var(--red), 0 4px 24px rgba(227,6,19,0.5);
+  animation:matchpulse 0.7s ease-in-out infinite alternate;
+}
+@keyframes matchpulse{
+  from{box-shadow:0 0 0 4px var(--red), 0 4px 16px rgba(227,6,19,0.4);}
+  to{box-shadow:0 0 0 8px var(--red), 0 4px 32px rgba(227,6,19,0.7);}
+}
+
+/* DECK EMPTY */
+#deck-empty{
+  display:none;position:fixed;inset:0;z-index:800;
+  background:rgba(0,0,0,0.6);align-items:center;justify-content:center;
+}
+#deck-empty.show{display:flex;}
+#de-box{background:#fff;border-radius:18px;padding:24px 28px;text-align:center;width:85%;max-width:280px;}
+
 /* GAME OVER */
 #gameover{
   display:none;position:fixed;inset:0;z-index:1000;
@@ -219,7 +268,14 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nu
   gap:16px;padding:32px;
 }
 #lobby-title{font-family:'Bebas Neue',sans-serif;font-size:72px;letter-spacing:8px;color:var(--blue);line-height:1;}
-#lobby-sub{font-size:12px;font-weight:700;color:#aaa;letter-spacing:1px;text-transform:uppercase;margin-top:-10px;}
+#lobby-sub{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:16px;letter-spacing:3px;
+  background:var(--red);color:#fff;
+  padding:4px 14px;border-radius:6px;
+  display:inline-block;
+  margin-top:-6px;
+}
 .linput{
   width:100%;max-width:280px;height:48px;
   border:2px solid rgba(0,48,135,0.2);border-radius:12px;
@@ -273,7 +329,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nu
 <!-- LOBBY -->
 <div id="lobby">
   <div id="lobby-title">GRAB</div>
-  <div id="lobby-sub">The Shopping Card Game</div>
+  <div id="lobby-sub">you blink you lose</div>
   <input class="linput" id="name-in" placeholder="Your name" maxlength="12" autocomplete="off">
   <button class="lbtn" id="btn-challenge" onclick="startChallenge()">CHALLENGE SOMEONE</button>
   <button class="lbtn" id="btn-join" onclick="joinGame()">JOIN GAME</button>
@@ -300,7 +356,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nu
 
 <!-- GAME -->
 <div id="app">
-  <div id="title">GRAB</div>
+  <div id="title">GRAB<div id="title-sub">you blink you lose</div></div>
 
   <!-- Opponent row -->
   <div class="prow" id="opp-row">
@@ -402,6 +458,18 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nu
   </div>
 </div>
 
+<!-- MATCH FLASH -->
+<div id="match-flash">MATCH!</div>
+
+<!-- DECK EMPTY -->
+<div id="deck-empty">
+  <div id="de-box">
+    <div style="font-size:32px;margin-bottom:6px">🔄</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--blue);letter-spacing:2px;">NO MATCHES!</div>
+    <div style="font-size:13px;font-weight:700;color:#555;margin:8px 0 0;line-height:1.5;">Deck exhausted with no matches.<br>Reshuffling and redealing...</div>
+  </div>
+</div>
+
 <!-- OPP LEFT -->
 <div id="opp-left">
   <div id="ol-box">
@@ -432,7 +500,7 @@ const PM = {
 
 // ── STATE ──
 let socket, mySocketId=null, myName='You', oppNameVal='Opponent';
-let myHandCount=26, oppCount=26, pile=[], isMyTurn=false, animating=false;
+let myHandCount=26, oppCount=26, pile=[], isMyTurn=false, animating=false, matchOnPile=false;
 let roomId=null, reshuffleDone=false, rsTimer=null, rsSecs=5;
 
 // ── DOM ──
@@ -581,6 +649,8 @@ function cascade(toStack, count, cb){
 
 // ── GRAB RESOLVE ──
 function resolveGrab(grabbedBy, grabberName, isMatch, pileSize, newTurn){
+  clearMatchGlow();
+  matchOnPile=false;
   animating=true;btnFlip.disabled=true;
   const iWon=isMatch?(grabbedBy===mySocketId):(grabbedBy!==mySocketId);
   const toStack=iWon?playerStack:oppStack;
@@ -631,6 +701,36 @@ function showConfetti(){
   setTimeout(()=>{confetti.classList.remove('show');confetti.innerHTML='';},1800);
 }
 
+// ── MATCH ALERT ──
+function showMatchAlert(){
+  const mf = document.getElementById('match-flash');
+  const pa = document.getElementById('pile-area');
+  // Flash the MATCH label briefly
+  mf.classList.add('show');
+  setTimeout(()=>{ mf.classList.remove('show'); }, 1000);
+  // Keep pile glowing red until grab clears it
+  pa.classList.add('match-glow');
+  // Play sharp alert sound
+  try{
+    const ctx=ac(),o=ctx.createOscillator(),g=ctx.createGain();
+    o.frequency.value=880;o.type='sine';
+    g.gain.setValueAtTime(0.3,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.3);
+    o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+0.3);
+  }catch(e){}
+}
+
+function clearMatchGlow(){
+  document.getElementById('pile-area').classList.remove('match-glow');
+}
+
+function showDeckEmpty(){
+  const de = document.getElementById('deck-empty');
+  de.classList.add('show');
+  pile=[];renderPile();updateUI();
+  setTimeout(()=>{ de.classList.remove('show'); },3000);
+}
+
 // ── ACTIONS ──
 function doFlip(){
   if(!isMyTurn||animating||myHandCount===0)return;
@@ -679,9 +779,17 @@ function connectSocket(){
     const from=data.by===mySocketId?playerStack:oppStack;
     flyCard(data.card,from,()=>{
       renderPile();bump();
+      if(data.isMatch){
+        matchOnPile=true;
+        showMatchAlert();
+      }
       isMyTurn=data.newTurn===mySocketId;
       animating=false;updateUI();
     });
+  });
+
+  socket.on('deck_empty',()=>{
+    showDeckEmpty();
   });
 
   socket.on('grab_result',data=>{
