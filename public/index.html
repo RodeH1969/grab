@@ -323,8 +323,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nu
 
 <!-- LOBBY -->
 <div id="lobby">
-  <div id="lobby-title">GRAB</div>
-  <div id="lobby-sub">you blink you lose</div>
+  <div id="lobby-header">
+    <div id="lobby-title">GRAB</div>
+    <img src="grab.png" id="lobby-card" alt="GRAB card">
+  </div>
+  <div id="lobby-sub">YOU BLINK YOU LOSE</div>
   <input class="linput" id="name-in" placeholder="Your name" maxlength="12" autocomplete="off">
   <button class="lbtn" id="btn-challenge" onclick="startChallenge()">CHALLENGE SOMEONE</button>
   <button class="lbtn" id="btn-join" onclick="joinGame()">JOIN GAME</button>
