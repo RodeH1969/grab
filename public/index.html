@@ -53,16 +53,16 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nu
 .pill-count{font-size:14px;font-weight:900;}
 
 /* Card stack */
-.stack{position:relative;width:174px;height:240px;flex-shrink:0;}
+.stack{position:relative;width:80px;height:112px;flex-shrink:0;}
 .stack-card{
   position:absolute;
-  width:162px;height:228px;
-  border-radius:16px;
+  width:74px;height:104px;
+  border-radius:10px;
   border:1.5px solid rgba(0,0,0,0.1);
-  box-shadow:0 4px 12px rgba(0,0,0,0.15);
+  box-shadow:0 3px 8px rgba(0,0,0,0.15);
   overflow:hidden;background:#fff;
 }
-.stack-card img{width:100%;height:100%;object-fit:cover;border-radius:15px;display:block;}
+.stack-card img{width:100%;height:100%;object-fit:cover;border-radius:9px;display:block;}
 
 /* Opponent row — stack rotated, pill normal */
 #opp-row{flex-direction:row-reverse;}
@@ -88,18 +88,18 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nu
 }
 #pile-count.bump{transform:scale(1.5);}
 
-#pile-area{position:relative;width:200px;height:280px;}
+#pile-area{position:relative;width:130px;height:182px;}
 #empty-pile{
-  width:190px;height:266px;
-  border-radius:18px;
+  width:122px;height:172px;
+  border-radius:12px;
   border:2px dashed rgba(0,0,0,0.12);
   display:flex;align-items:center;justify-content:center;
-  font-size:11px;font-weight:700;color:#ccc;letter-spacing:1px;
+  font-size:10px;font-weight:700;color:#ccc;letter-spacing:1px;
 }
 .pcrd{
   position:absolute;
-  width:190px;height:266px;
-  border-radius:18px;
+  width:122px;height:172px;
+  border-radius:12px;
   border:1.5px solid rgba(0,0,0,0.1);
   box-shadow:0 4px 16px rgba(0,0,0,0.12);
   overflow:hidden;background:#fff;
@@ -143,8 +143,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nu
 /* FLYING CARD */
 .fly{
   position:fixed;
-  width:190px;height:266px;
-  border-radius:18px;
+  width:122px;height:172px;
+  border-radius:12px;
   border:1.5px solid rgba(0,0,0,0.1);
   box-shadow:0 8px 28px rgba(0,0,0,0.25);
   overflow:hidden;pointer-events:none;
@@ -305,8 +305,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nu
   <!-- Opponent row -->
   <div class="prow" id="opp-row">
     <div class="stack" id="opp-stack">
-      <div class="stack-card" style="top:12px;left:6px;opacity:0.35"><img src="grab.png" alt=""></div>
-      <div class="stack-card" style="top:6px;left:3px;opacity:0.65"><img src="grab.png" alt=""></div>
+      <div class="stack-card" style="top:5px;left:3px;opacity:0.35"><img src="grab.png" alt=""></div>
+      <div class="stack-card" style="top:2px;left:1px;opacity:0.65"><img src="grab.png" alt=""></div>
       <div class="stack-card" style="top:0;left:0"><img src="grab.png" alt=""></div>
     </div>
     <div class="pill pill-red">
@@ -334,8 +334,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nu
       <span class="pill-count" id="player-count">26</span>
     </div>
     <div class="stack" id="player-stack">
-      <div class="stack-card" style="top:12px;left:6px;opacity:0.35"><img src="grab.png" alt=""></div>
-      <div class="stack-card" style="top:6px;left:3px;opacity:0.65"><img src="grab.png" alt=""></div>
+      <div class="stack-card" style="top:5px;left:3px;opacity:0.35"><img src="grab.png" alt=""></div>
+      <div class="stack-card" style="top:2px;left:1px;opacity:0.65"><img src="grab.png" alt=""></div>
       <div class="stack-card" style="top:0;left:0"><img src="grab.png" alt=""></div>
     </div>
   </div>
@@ -527,13 +527,13 @@ function flyCard(productId, fromEl, cb){
   const to=pileArea.getBoundingClientRect();
   const el=document.createElement('div');
   el.className='fly';
-  el.style.left=fr.left+(fr.width-190)/2+'px';
-  el.style.top=fr.top+(fr.height-266)/2+'px';
+  el.style.left=fr.left+(fr.width-122)/2+'px';
+  el.style.top=fr.top+(fr.height-172)/2+'px';
   const img=document.createElement('img');img.src='grab.png';img.alt='';
   el.appendChild(img);
   document.body.appendChild(el);
   sndSlide();
-  const dx=to.left+(to.width-190)/2, dy=to.top+(to.height-266)/2;
+  const dx=to.left+(to.width-122)/2, dy=to.top+(to.height-172)/2;
   const rot=(Math.random()-0.5)*16;
   requestAnimationFrame(()=>{
     el.style.transition='left 0.2s cubic-bezier(0.22,1,0.36,1),top 0.2s cubic-bezier(0.22,1,0.36,1),transform 0.2s ease';
@@ -562,11 +562,11 @@ function cascade(toStack, count, cb){
     const fr=pileArea.getBoundingClientRect();
     const to=toStack.getBoundingClientRect();
     const el=document.createElement('div');el.className='fly';
-    el.style.left=fr.left+(fr.width-190)/2+'px';el.style.top=fr.top+(fr.height-266)/2+'px';
+    el.style.left=fr.left+(fr.width-122)/2+'px';el.style.top=fr.top+(fr.height-172)/2+'px';
     const img=document.createElement('img');img.src='grab.png';img.alt='';
     el.appendChild(img);document.body.appendChild(el);
-    const dx=to.left+(to.width-190)/2+(Math.random()-0.5)*8;
-    const dy=to.top+(to.height-266)/2;
+    const dx=to.left+(to.width-122)/2+(Math.random()-0.5)*8;
+    const dy=to.top+(to.height-172)/2;
     const rot=(Math.random()-0.5)*18;
     requestAnimationFrame(()=>{
       el.style.transition='left 0.18s ease,top 0.18s ease,transform 0.18s ease';
