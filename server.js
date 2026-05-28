@@ -11,7 +11,13 @@ const io = new Server(server, {
   allowUpgrades: false,
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  etag: false,
+  lastModified: false,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-store');
+  }
+}));
 
 const PRODUCTS = [
   'bega','blackstone','chicken','cottage','disan',
