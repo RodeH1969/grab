@@ -247,14 +247,59 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nu
 /* GAME OVER */
 #gameover{
   display:none;position:fixed;inset:0;z-index:1000;
-  background:rgba(0,0,0,0.7);
+  background:rgba(0,0,0,0.85);
   align-items:center;justify-content:center;
+  flex-direction:column;
 }
 #gameover.show{display:flex;}
-#go-box{background:#fff;border-radius:20px;padding:32px 28px;text-align:center;width:85%;max-width:280px;}
-#go-title{font-family:'Bebas Neue',sans-serif;font-size:38px;letter-spacing:3px;color:var(--blue);}
-#go-msg{font-size:14px;font-weight:700;color:#555;margin:8px 0 18px;}
-#go-btn{width:100%;height:48px;border:none;border-radius:12px;background:var(--blue);color:#fff;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;cursor:pointer;}
+#go-cards{position:fixed;inset:0;pointer-events:none;z-index:999;overflow:hidden;}
+#go-box{
+  background:#fff;border-radius:24px;
+  padding:32px 28px;text-align:center;
+  width:88%;max-width:300px;
+  box-shadow:0 0 0 4px var(--gold),0 20px 60px rgba(0,0,0,0.5);
+  position:relative;z-index:1001;
+  animation:jackpot-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards;
+}
+@keyframes jackpot-pop{
+  0%{transform:scale(0.2) rotate(-10deg);opacity:0;}
+  60%{transform:scale(1.08) rotate(2deg);}
+  100%{transform:scale(1) rotate(0deg);opacity:1;}
+}
+#go-trophy{font-size:56px;margin-bottom:4px;animation:spin-trophy 0.6s ease 0.5s both;}
+@keyframes spin-trophy{
+  0%{transform:rotateY(0deg) scale(0.5);}
+  100%{transform:rotateY(720deg) scale(1);}
+}
+#go-title{
+  font-family:'Bebas Neue',sans-serif;font-size:48px;letter-spacing:3px;
+  background:linear-gradient(135deg,var(--blue),#0066ff,var(--blue));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  margin-bottom:4px;
+}
+#go-title.loser{
+  background:linear-gradient(135deg,var(--red),#ff4444,var(--red));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+#go-winner{font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:2px;color:var(--gold);margin-bottom:4px;}
+#go-msg{font-size:13px;font-weight:700;color:#888;margin:4px 0 20px;}
+#go-btn{
+  width:100%;height:52px;border:none;border-radius:14px;
+  background:var(--blue);color:#fff;
+  font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;
+  cursor:pointer;
+  box-shadow:0 4px 0 rgba(0,24,90,0.5);
+}
+#go-btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,24,90,0.5);}
+.go-card{
+  position:fixed;
+  width:44px;height:62px;
+  border-radius:7px;
+  overflow:hidden;
+  pointer-events:none;
+  z-index:1000;
+}
+.go-card img{width:100%;height:100%;object-fit:cover;display:block;}
 
 /* OPP LEFT */
 #opp-left{display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;}
@@ -439,8 +484,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nu
 
 <!-- GAME OVER -->
 <div id="gameover">
+  <div id="go-cards"></div>
   <div id="go-box">
-    <div id="go-title">GAME OVER</div>
+    <div id="go-trophy">🏆</div>
+    <div id="go-title">GRAB!</div>
+    <div id="go-winner"></div>
     <div id="go-msg"></div>
     <button id="go-btn" onclick="location.reload()">PLAY AGAIN</button>
   </div>
@@ -765,6 +813,125 @@ function showDeckEmpty(){
   setTimeout(()=>{ de.classList.remove('show'); },3000);
 }
 
+// ── GAME OVER ──
+function showGameOver(won, winnerName){
+  const box    = D('go-box');
+  const title  = D('go-title');
+  const winner = D('go-winner');
+  const msg    = D('go-msg');
+  const trophy = D('go-trophy');
+
+  if(won){
+    trophy.textContent = '🏆';
+    title.textContent  = 'YOU WIN!';
+    title.className    = '';
+    winner.textContent = winnerName + ' GRABS IT ALL!';
+    msg.textContent    = 'Total domination. They blinked.';
+  } else {
+    trophy.textContent = '😵';
+    title.textContent  = 'YOU LOSE!';
+    title.className    = 'loser';
+    winner.textContent = winnerName + ' WINS!';
+    msg.textContent    = 'You blinked. Don't blink next time.';
+  }
+
+  D('gameover').classList.add('show');
+  sndJackpot(won);
+  if(won) launchCards();
+}
+
+function sndJackpot(won){
+  try{
+    const ctx = ac();
+    const now = ctx.currentTime;
+    if(won){
+      // Ascending jackpot fanfare
+      const notes = [261.63,329.63,392,523.25,659.25,783.99,1046.5];
+      notes.forEach((freq,i)=>{
+        const o=ctx.createOscillator(),g=ctx.createGain();
+        o.type='triangle';
+        o.frequency.setValueAtTime(freq,now+i*0.08);
+        g.gain.setValueAtTime(0.2,now+i*0.08);
+        g.gain.exponentialRampToValueAtTime(0.001,now+i*0.08+0.4);
+        o.connect(g);g.connect(ctx.destination);
+        o.start(now+i*0.08);o.stop(now+i*0.08+0.4);
+      });
+      // Coin pour sound — rapid high pings
+      for(let i=0;i<40;i++){
+        const o=ctx.createOscillator(),g=ctx.createGain();
+        o.type='sine';
+        o.frequency.value=800+Math.random()*800;
+        const t=now+0.3+i*0.04+Math.random()*0.02;
+        g.gain.setValueAtTime(0.08,t);
+        g.gain.exponentialRampToValueAtTime(0.001,t+0.12);
+        o.connect(g);g.connect(ctx.destination);
+        o.start(t);o.stop(t+0.15);
+      }
+    } else {
+      // Sad descending trombone
+      const o=ctx.createOscillator(),g=ctx.createGain();
+      o.type='sawtooth';
+      o.frequency.setValueAtTime(400,now);
+      o.frequency.exponentialRampToValueAtTime(80,now+1.2);
+      g.gain.setValueAtTime(0.3,now);
+      g.gain.exponentialRampToValueAtTime(0.001,now+1.4);
+      o.connect(g);g.connect(ctx.destination);
+      o.start(now);o.stop(now+1.5);
+    }
+  }catch(e){}
+}
+
+function launchCards(){
+  const container = D('go-cards');
+  container.innerHTML='';
+  let count=0;
+  const total=120;
+
+  function spawnCard(){
+    if(count>=total) return;
+    count++;
+    const el=document.createElement('div');
+    el.className='go-card';
+    const img=document.createElement('img');
+    img.src='grab.png';img.alt='';
+    el.appendChild(img);
+
+    // Start from random position along bottom or sides
+    const side=Math.floor(Math.random()*3);
+    let startX,startY;
+    if(side===0){ startX=Math.random()*window.innerWidth; startY=window.innerHeight+30; }
+    else if(side===1){ startX=-50; startY=Math.random()*window.innerHeight; }
+    else { startX=window.innerWidth+50; startY=Math.random()*window.innerHeight; }
+
+    el.style.left=startX+'px';
+    el.style.top=startY+'px';
+    el.style.opacity='1';
+    container.appendChild(el);
+
+    // Fly to random position on screen
+    const destX = Math.random()*window.innerWidth;
+    const destY = Math.random()*window.innerHeight;
+    const rot   = (Math.random()-0.5)*720;
+    const dur   = 0.6+Math.random()*0.8;
+
+    requestAnimationFrame(()=>{
+      el.style.transition=`left ${dur}s cubic-bezier(0.2,0.8,0.4,1), top ${dur}s cubic-bezier(0.2,0.8,0.4,1), transform ${dur}s ease, opacity 0.3s ease ${dur-0.3}s`;
+      el.style.left=destX+'px';
+      el.style.top=destY+'px';
+      el.style.transform=`rotate(${rot}deg) scale(${0.5+Math.random()})`;
+    });
+
+    setTimeout(()=>{
+      el.style.opacity='0';
+      setTimeout(()=>{ if(el.parentNode) el.parentNode.removeChild(el); },300);
+    }, dur*1000);
+
+    setTimeout(spawnCard, 30+Math.random()*40);
+  }
+
+  spawnCard();
+}
+
 // ── ACTIONS ──
 function doFlip(){
   if(!isMyTurn||animating||myHandCount===0)return;
@@ -846,8 +1013,7 @@ function connectSocket(){
 
   socket.on('game_over',data=>{
     const won=data.winner===myName;
-    D('go-msg').textContent=won?'🏆 You collected all the cards!':oppNameVal+' collected all the cards';
-    D('gameover').classList.add('show');
+    showGameOver(won, data.winner);
   });
 
   socket.on('opponent_left',()=>{ D('opp-left').classList.add('show'); });
