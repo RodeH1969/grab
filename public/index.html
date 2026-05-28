@@ -294,12 +294,13 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nu
   gap:16px;padding:28px;
 }
 #reshuffle.show{display:flex;}
-#rs-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:3px;color:var(--blue);}
-#deck-stage{position:relative;width:160px;height:100px;flex-shrink:0;}
+#rs-title{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:4px;color:var(--blue);text-align:center;line-height:1;}
+#rs-sub{display:block;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:3px;background:var(--red);color:#fff;padding:3px 14px;border-radius:6px;margin-top:4px;}
+#deck-stage{position:relative;width:320px;height:200px;flex-shrink:0;}
 .dc{
-  position:absolute;width:44px;height:62px;
-  border-radius:6px;overflow:hidden;
-  box-shadow:0 2px 6px rgba(0,0,0,0.2);
+  position:absolute;width:88px;height:124px;
+  border-radius:10px;overflow:hidden;
+  box-shadow:0 3px 10px rgba(0,0,0,0.2);
   transform-origin:bottom center;
 }
 .dc img{width:100%;height:100%;object-fit:cover;display:block;}
@@ -330,7 +331,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nu
 
 <!-- RESHUFFLE -->
 <div id="reshuffle">
-  <div id="rs-title">NEW GAME</div>
+  <div id="rs-title">GRAB<span id="rs-sub">you blink you lose</span></div>
   <div id="deck-stage"></div>
   <div id="rs-msg">Either player can shuffle before we start</div>
   <div id="rs-ring">
@@ -369,7 +370,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Nu
     <div id="pile-wrap">
       <div id="pile-count"></div>
       <div id="pile-area">
-        <div id="empty-pile">EMPTY</div>
+        <div id="empty-pile"></div>
       </div>
     </div>
   </div>
@@ -823,7 +824,7 @@ function startChallenge(){
     copyBtn.textContent='COPY INVITE LINK';
     copyBtn.onclick=()=>{
       if(navigator.share){
-        navigator.share({title:'GRAB',text:myName+' is challenging you to GRAB!',url:link});
+        navigator.share({title:'GRAB',text:myName+' has issued the challenge to you to a quick game of GRAB - you blink you lose. Let\'s rumble!',url:link});
       } else {
         navigator.clipboard?.writeText(link);
         copyBtn.textContent='LINK COPIED!';
@@ -860,25 +861,25 @@ function buildDeck(){
     const img=document.createElement('img');img.src='grab.png';img.alt='';
     c.appendChild(img);
     const angle=-18+(i/(n-1))*36;
-    const x=58+(i/(n-1))*58;
-    c.style.left=x+'px';c.style.top='18px';
+    const x=116+(i/(n-1))*116;
+    c.style.left=x+'px';c.style.top='36px';
     c.style.transform=`rotate(${angle}deg)`;c.style.zIndex=i;
     stage.appendChild(c);
   }
 }
 
 function startCountdown(){
-  rsSecs=5;reshuffleDone=false;
-  updateArc(5);D('rs-num').textContent=5;
+  rsSecs=10;reshuffleDone=false;
+  updateArc(5);D('rs-num').textContent=10;
   rsTimer=setInterval(()=>{
     rsSecs--;D('rs-num').textContent=rsSecs;updateArc(rsSecs);
-    D('rs-arc').style.stroke=rsSecs<=2?'#e30613':'#003087';
+    D('rs-arc').style.stroke=rsSecs<=3?'#e30613':'#003087';
     if(rsSecs<=0){clearInterval(rsTimer);socket.emit('start_game');}
   },1000);
 }
 
 function updateArc(s){
-  D('rs-arc').style.strokeDashoffset=169.6*(1-s/5);
+  D('rs-arc').style.strokeDashoffset=169.6*(1-s/10);
 }
 
 function doReshuffle(){
@@ -905,7 +906,7 @@ function animateRiffle(cb){
         c.style.transition='transform 0.28s cubic-bezier(0.22,1,0.36,1),left 0.28s ease';
         c.style.setProperty('--r',rot+'deg');
         c.style.transform=`rotate(0deg)`;
-        c.style.left=58+(i/(n-1))*58+'px';
+        c.style.left=116+(i/(n-1))*116+'px';
       },i*40);
     });
   },260);
@@ -913,7 +914,7 @@ function animateRiffle(cb){
     cards.forEach((c,i)=>{
       c.style.transition='transform 0.28s ease,left 0.28s ease';
       c.style.transform=`rotate(${(i-n/2)*1.4}deg)`;
-      c.style.left=76+(i-n/2)*2.5+'px';
+      c.style.left=160+(i-n/2)*5+'px';
     });
     setTimeout(cb,350);
   },260+n*40+320);
