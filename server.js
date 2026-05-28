@@ -25,10 +25,42 @@ const PRODUCTS = [
   'wisdom','bebeto','colway'
 ];
 
-function buildDeck(){
+function buildDeck(biased=false){
   const deck = [];
   PRODUCTS.forEach(id => { for(let i=0;i<4;i++) deck.push(id); });
+  if(biased) return biasedShuffle(deck);
   return shuffle(deck);
+}
+
+function biasedShuffle(deck){
+  // Start with a full random shuffle
+  const d = shuffle(deck);
+
+  // Inject 6 guaranteed adjacent pairs at random positions
+  // Pick 6 random products, find two copies each and place them adjacent
+  const targets = shuffle([...PRODUCTS]).slice(0, 6);
+
+  targets.forEach(product => {
+    // Find two instances of this product in the deck
+    const indices = [];
+    for(let i=0;i<d.length;i++){
+      if(d[i]===product) indices.push(i);
+      if(indices.length===2) break;
+    }
+    if(indices.length < 2) return;
+
+    const [i1, i2] = indices;
+    // Remove second instance from its current position
+    d.splice(i2, 1);
+    // Re-find first instance (index may have shifted)
+    const newI1 = d.indexOf(product);
+    // Insert second instance right after first — but not at position 0 or 1
+    // to avoid a match on the very first flip
+    const insertAt = Math.max(2, newI1 + 1);
+    d.splice(insertAt, 0, product);
+  });
+
+  return d;
 }
 
 function shuffle(a){
@@ -47,7 +79,7 @@ function makeRoomId(){
 }
 
 function createRoom(){
-  const deck = buildDeck();
+  const deck = buildDeck(true); // biased for first deal
   return {
     players:       [],
     deck,
@@ -136,7 +168,7 @@ io.on('connection', (socket) => {
     const room = rooms[socket.roomId];
     if(!room || room.reshuffleUsed || room.phase !== 'reshuffle') return;
     room.reshuffleUsed = true;
-    room.deck = buildDeck();
+    room.deck = buildDeck(true); // biased on manual reshuffle too
     dealHands(room);
 
     const p0 = room.players[0];
@@ -207,7 +239,7 @@ io.on('connection', (socket) => {
     const p0 = room.players[0], p1 = room.players[1];
     if(room.hands[p0.socketId].length === 0 && room.hands[p1.socketId].length === 0 && room.pile.length === 0){
       // Full deck exhausted with no match — reshuffle everything
-      room.deck = buildDeck();
+      room.deck = buildDeck(false); // normal shuffle after deck exhausted
       dealHands(room);
       room.turn = room.players[0].socketId;
       io.to(socket.roomId).emit('deck_empty');
