@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>GRAB</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+<script src="/socket.io/socket.io.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+:root { --blue:#003087; --red:#e30613; --gold:#ffd700; --white:#ffffff; }
+html,body { width:100%; height:100%; overflow:hidden; font-family:'Nunito',sans-serif; background:var(--white); touch-action:none; user-select:none; }
+
+#app { width:100%; height:100vh; display:flex; flex-direction:column; align-items:center; background:var(--white); position:fixed; top:0; left:0; overflow:clip; }
+
+#title { font-family:'Bebas Neue',sans-serif; font-size:38px; letter-spacing:6px; color:var(--blue); padding:10px 0 4px; line-height:1; flex-shrink:0; }
+
+.player-zone { display:flex; flex-direction:column; align-items:center; gap:8px; flex-shrink:0; }
+#opp-zone { flex-direction:column-reverse; }
+
+.pill { height:32px; border-radius:20px; padding:0 14px; display:flex; align-items:center; gap:8px; font-size:13px; font-weight:900; letter-spacing:0.5px; white-space:nowrap; }
+.pill-blue { background:var(--blue); color:white; }
+.pill-red  { background:var(--red);  color:white; }
+.pill-count { font-size:15px; font-weight:900; transition:all 0.3s; }
+
+/* HAND STACK */
+.hand-stack { position:relative; width:80px; height:110px; }
+.card { position:absolute; width:76px; height:106px; border-radius:11px; border:1.5px solid rgba(0,0,0,0.1); box-shadow:0 2px 8px rgba(0,0,0,0.12); overflow:hidden; background:white; display:flex; align-items:center; justify-content:center; }
+.card-back-logo { width:50px; height:50px; background:var(--red); border:2.5px solid var(--gold); border-radius:8px; display:flex; align-items:center; justify-content:center; font-family:'Bebas Neue',sans-serif; font-size:16px; letter-spacing:2px; color:white; }
+
+/* CARD BACK — grab.png fills full card */
+.card-back-img { width:76px; height:106px; border-radius:11px; object-fit:cover; display:block; }
+
+/* CARD FRONT — real image */
+.card-front-img { width:76px; height:106px; border-radius:11px; object-fit:cover; display:block; }
+
+/* CENTRE */
+#centre { flex:1; min-height:0; width:100%; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
+#pile-container { display:flex; flex-direction:column; align-items:center; gap:8px; }
+#pile-count { font-family:'Bebas Neue',sans-serif; font-size:52px; color:var(--blue); line-height:1; min-height:52px; transition:transform 0.2s cubic-bezier(0.34,1.56,0.64,1); }
+#pile-count.bump { transform:scale(1.4); }
+#pile-area { position:relative; width:80px; height:110px; }
+.pile-card { position:absolute; width:76px; height:106px; border-radius:11px; border:1.5px solid rgba(0,0,0,0.1); box-shadow:0 2px 8px rgba(0,0,0,0.1); overflow:hidden; background:white; }
+#empty-pile { width:76px; height:106px; border-radius:11px; border:2px dashed rgba(0,0,0,0.12); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#ccc; letter-spacing:1px; }
+
+/* BUTTONS */
+#btn-row { display:flex; gap:12px; padding:10px 0 8px; flex-shrink:0; }
+.game-btn { height:52px; width:140px; border:none; border-radius:14px; font-family:'Bebas Neue',sans-serif; font-size:24px; letter-spacing:2px; cursor:pointer; transition:transform 0.1s,box-shadow 0.1s,opacity 0.2s; }
+#btn-flip { background:var(--blue); color:white; box-shadow:0 4px 14px rgba(0,48,135,0.35); }
+#btn-flip:disabled { opacity:0.35; box-shadow:none; cursor:default; }
+#btn-grab { background:var(--red); color:white; box-shadow:0 4px 14px rgba(227,6,19,0.35); }
+.game-btn:active:not(:disabled) { transform:scale(0.94); box-shadow:none; }
+
+/* TICKER */
+#ticker-wrap { width:100%; background:var(--blue); overflow:hidden; flex-shrink:0; height:28px; display:flex; align-items:center; }
+#ticker-track { display:flex; white-space:nowrap; animation:ticker 30s linear infinite; }
+.ticker-item { font-size:11px; font-weight:700; color:var(--gold); letter-spacing:0.5px; padding:0 20px; }
+.ticker-sep { font-size:11px; color:rgba(255,215,0,0.4); }
+@keyframes ticker { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+/* FLYING CARD */
+.flying { position:fixed; width:76px; height:106px; border-radius:11px; border:1.5px solid rgba(0,0,0,0.1); box-shadow:0 8px 28px rgba(0,0,0,0.22); overflow:hidden; pointer-events:none; z-index:500; background:white; display:flex; align-items:center; justify-content:center; }
+
+/* OVERLAY */
+#overlay { display:none; position:fixed; inset:0; z-index:800; background:rgba(0,0,0,0.55); align-items:center; justify-content:center; flex-direction:column; }
+#overlay.show { display:flex; }
+#popup { background:white; border-radius:20px; padding:28px 32px; text-align:center; max-width:300px; width:88%; box-shadow:0 16px 48px rgba(0,0,0,0.3); animation:popin 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes popin { from{transform:scale(0.5);opacity:0} to{transform:scale(1);opacity:1} }
+#popup-icon { font-size:48px; margin-bottom:8px; }
+#popup-title { font-family:'Bebas Neue',sans-serif; font-size:28px; letter-spacing:2px; color:var(--blue); margin-bottom:6px; }
+#popup-msg { font-size:14px; font-weight:700; color:#555; line-height:1.4; }
+
+/* BAROMETER */
+#barometer-wrap { display:none; position:fixed; inset:0; z-index:900; align-items:center; justify-content:center; pointer-events:none; }
+#barometer-wrap.show { display:flex; }
+.baro { background:white; border-radius:20px; padding:20px 28px; box-shadow:0 12px 40px rgba(0,0,0,0.2); display:flex; flex-direction:column; align-items:center; gap:6px; min-width:140px; }
+.baro-label { font-size:11px; font-weight:700; letter-spacing:1px; color:#aaa; text-transform:uppercase; }
+.baro-count { font-family:'Bebas Neue',sans-serif; font-size:64px; line-height:1; color:var(--blue); }
+.baro-count.win-color { color:#16a34a; }
+.baro-count.lose-color { color:var(--red); }
+
+/* CELEBRATE */
+#celebrate { display:none; position:fixed; inset:0; pointer-events:none; z-index:700; overflow:hidden; }
+#celebrate.show { display:block; }
+.confetti { position:absolute; width:10px; height:10px; border-radius:2px; opacity:0; animation:conffall 1.2s ease-in forwards; }
+@keyframes conffall { 0%{opacity:1;transform:translateY(-20px) rotate(0deg)} 100%{opacity:0;transform:translateY(100vh) rotate(720deg)} }
+
+/* GAME OVER */
+#gameover { display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; }
+#gameover.show { display:flex; }
+#gameover-box { background:white; border-radius:24px; padding:36px 32px; text-align:center; width:88%; max-width:300px; }
+#gameover-title { font-family:'Bebas Neue',sans-serif; font-size:42px; letter-spacing:3px; color:var(--blue); }
+#gameover-msg { font-size:16px; font-weight:700; color:#555; margin:8px 0 20px; }
+#gameover-replay { height:52px; width:100%; border:none; border-radius:14px; background:var(--blue); color:white; font-family:'Bebas Neue',sans-serif; font-size:24px; letter-spacing:2px; cursor:pointer; }
+
+/* LOBBY */
+#lobby { position:fixed; inset:0; background:white; z-index:1000; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; padding:32px; }
+#lobby-title { font-family:'Bebas Neue',sans-serif; font-size:72px; letter-spacing:8px; color:var(--blue); line-height:1; }
+#lobby-sub { font-size:13px; font-weight:700; color:#aaa; letter-spacing:1px; text-transform:uppercase; margin-top:-12px; }
+.lobby-input { width:100%; max-width:280px; height:50px; border:2px solid rgba(0,48,135,0.2); border-radius:12px; padding:0 16px; font-size:16px; font-weight:700; font-family:'Nunito',sans-serif; color:var(--blue); outline:none; text-align:center; background:#f8f8ff; }
+.lobby-input:focus { border-color:var(--blue); }
+.lobby-btn { width:100%; max-width:280px; height:52px; border:none; border-radius:14px; font-family:'Bebas Neue',sans-serif; font-size:24px; letter-spacing:2px; cursor:pointer; background:var(--blue); color:white; box-shadow:0 4px 14px rgba(0,48,135,0.35); }
+.lobby-btn:active { transform:scale(0.96); }
+#lobby-status { font-size:13px; font-weight:700; color:#aaa; text-align:center; min-height:20px; }
+
+/* RESHUFFLE */
+#reshuffle-screen { display:none; position:fixed; inset:0; background:white; z-index:999; flex-direction:column; align-items:center; justify-content:center; gap:20px; padding:32px; }
+#deck-stage { position:relative; width:180px; height:120px; margin:8px 0; }
+.deck-card { position:absolute; width:52px; height:72px; border-radius:7px; background:var(--blue); border:1.5px solid rgba(255,255,255,0.15); box-shadow:0 2px 8px rgba(0,0,0,0.2); display:flex; align-items:center; justify-content:center; transform-origin:bottom center; }
+.deck-card-logo { width:32px; height:32px; background:var(--red); border:1.5px solid var(--gold); border-radius:5px; display:flex; align-items:center; justify-content:center; font-family:'Bebas Neue',sans-serif; font-size:10px; letter-spacing:1px; color:white; }
+@keyframes shuffle-fly { 0%{transform:translateY(0) rotate(0deg) scale(1);opacity:1} 40%{transform:translateY(-40px) rotate(var(--fly-rot)) scale(0.9);opacity:1} 100%{transform:translateY(0) rotate(0deg) scale(1);opacity:1} }
+#reshuffle-btn { height:52px; width:220px; border:none; border-radius:14px; background:var(--blue); color:white; font-family:'Bebas Neue',sans-serif; font-size:24px; letter-spacing:2px; cursor:pointer; box-shadow:0 4px 14px rgba(0,48,135,0.35); }
+#shuffling-label { display:none; font-size:13px; font-weight:700; color:#aaa; letter-spacing:1px; text-transform:uppercase; }
+
+/* WAITING */
+#waiting-screen { display:none; position:fixed; inset:0; background:white; z-index:998; flex-direction:column; align-items:center; justify-content:center; gap:16px; }
+#waiting-screen.show { display:flex; }
+#waiting-dots { font-family:'Bebas Neue',sans-serif; font-size:48px; color:var(--blue); letter-spacing:6px; animation:blink 1.2s ease-in-out infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+/* OPP LEFT */
+#opp-left { display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.6); align-items:center; justify-content:center; }
+#opp-left.show { display:flex; }
+#opp-left-box { background:white; border-radius:20px; padding:28px 32px; text-align:center; width:88%; max-width:300px; }
+</style>
+</head>
+<body>
+
+<!-- LOBBY -->
+<div id="lobby">
+  <div id="lobby-title">GRAB</div>
+  <div id="lobby-sub">The Shopping Card Game</div>
+  <input class="lobby-input" id="name-input" placeholder="Your name" maxlength="12" autocomplete="off">
+  <button class="lobby-btn" id="challenge-btn" onclick="startChallenge()">CHALLENGE SOMEONE</button>
+  <button class="lobby-btn" id="join-btn" onclick="joinGame()" style="display:none;background:#16a34a">JOIN GAME</button>
+  <div id="lobby-status"></div>
+</div>
+
+<!-- WAITING FOR OPPONENT -->
+<div id="waiting-screen">
+  <div id="waiting-dots">GRAB</div>
+  <div style="font-size:14px;font-weight:700;color:#aaa;">Waiting for opponent...</div>
+</div>
+
+<!-- RESHUFFLE -->
+<div id="reshuffle-screen">
+  <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;color:var(--blue);">NEW GAME</div>
+  <div id="deck-stage"></div>
+  <div id="reshuffle-msg" style="font-size:14px;font-weight:700;color:#555;text-align:center;line-height:1.5;">Either player can shuffle<br>the deck before we start</div>
+  <div id="countdown-ring" style="position:relative;width:72px;height:72px;">
+    <svg width="72" height="72" style="position:absolute;top:0;left:0;">
+      <circle cx="36" cy="36" r="30" fill="none" stroke="#e8e8e8" stroke-width="5"/>
+      <circle id="countdown-arc" cx="36" cy="36" r="30" fill="none" stroke="#003087" stroke-width="5" stroke-dasharray="188.5" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 36 36)" style="transition:stroke-dashoffset 1s linear;"/>
+    </svg>
+    <div id="countdown-num" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:28px;color:#003087;">5</div>
+  </div>
+  <button id="reshuffle-btn" onclick="doReshuffle()">SHUFFLE DECK</button>
+  <div id="shuffling-label">Shuffling...</div>
+</div>
+
+<!-- GAME -->
+<div id="app">
+  <div id="title">GRAB</div>
+
+  <div class="player-zone" id="opp-zone">
+    <div class="pill pill-red" id="opp-pill">
+      <span class="pill-name" id="opp-name">Opponent</span>
+      <span style="opacity:0.4">·</span>
+      <span class="pill-count" id="opp-count">26</span>
+    </div>
+    <div class="hand-stack" id="opp-stack" style="transform:rotate(180deg)">
+      <div class="card" style="top:5px;left:3px;opacity:0.35"><img class="card-back-img" src="grab.png" alt="GRAB"></div>
+      <div class="card" style="top:2px;left:1px;opacity:0.65"><img class="card-back-img" src="grab.png" alt="GRAB"></div>
+      <div class="card" style="top:0;left:0"><img class="card-back-img" src="grab.png" alt="GRAB"></div>
+    </div>
+  </div>
+
+  <div id="centre">
+    <div id="pile-container">
+      <div id="pile-count"></div>
+      <div id="pile-area">
+        <div id="empty-pile">EMPTY</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="player-zone" id="player-zone">
+    <div class="hand-stack" id="player-stack">
+      <div class="card" style="top:5px;left:3px;opacity:0.35"><img class="card-back-img" src="grab.png" alt="GRAB"></div>
+      <div class="card" style="top:2px;left:1px;opacity:0.65"><img class="card-back-img" src="grab.png" alt="GRAB"></div>
+      <div class="card" style="top:0;left:0"><img class="card-back-img" src="grab.png" alt="GRAB"></div>
+    </div>
+    <div class="pill pill-blue" id="player-pill">
+      <span class="pill-name" id="player-name">You</span>
+      <span style="opacity:0.4">·</span>
+      <span class="pill-count" id="player-count">26</span>
+    </div>
+  </div>
+
+  <div id="btn-row">
+    <button class="game-btn" id="btn-flip" onclick="doFlip()">FLIP</button>
+    <button class="game-btn" id="btn-grab" onclick="doGrab()">GRAB</button>
+  </div>
+
+  <div id="ticker-wrap">
+    <div id="ticker-track">
+      <span class="ticker-item">⭐ Today's GRAB brought to you by Aldi</span>
+      <span class="ticker-sep">✦✦✦</span>
+      <span class="ticker-item">🎿 ALDI SNOW DROP ALERT ❄️ SAT 23 MAY ⛷️ CRANE SKI SPECIALS LIVE NOW</span>
+      <span class="ticker-sep">✦✦✦</span>
+      <span class="ticker-item">🟢 MENS PREMIUM SKI PANTS $79.99 ✦ WOMENS SNOWSUIT $79.99 ✦ WOMENS PREMIUM SKI PANTS $79.99 ✦ WOMENS THERMAL UNDERWEAR SET $29.99</span>
+      <span class="ticker-sep">✦✦✦</span>
+      <span class="ticker-item">🧤 MENS PREMIUM SKI GLOVES $34.99 ✦ WOMENS PREMIUM SKI GLOVES $34.99 ✦ PREMIUM SKI MITTENS $34.99 ✦ TOUCHSCREEN GLOVES $9.99</span>
+      <span class="ticker-sep">✦✦✦</span>
+      <span class="ticker-item">🧦 CHILDRENS SKI SOCKS $8.99 ✦ CHILDRENS KNITTED ACCESSORIES $6.99 ✦ CHILDRENS SNOW JACKET $39.99 ✦ TODDLER SNOW SUIT $39.99</span>
+      <span class="ticker-sep">✦✦✦</span>
+      <span class="ticker-item">⭐ Today's GRAB brought to you by Aldi</span>
+      <span class="ticker-sep">✦✦✦</span>
+      <span class="ticker-item">🎿 ALDI SNOW DROP ALERT ❄️ SAT 23 MAY ⛷️ CRANE SKI SPECIALS LIVE NOW</span>
+      <span class="ticker-sep">✦✦✦</span>
+      <span class="ticker-item">🟢 MENS PREMIUM SKI PANTS $79.99 ✦ WOMENS SNOWSUIT $79.99 ✦ WOMENS PREMIUM SKI PANTS $79.99 ✦ WOMENS THERMAL UNDERWEAR SET $29.99</span>
+      <span class="ticker-sep">✦✦✦</span>
+      <span class="ticker-item">🧤 MENS PREMIUM SKI GLOVES $34.99 ✦ WOMENS PREMIUM SKI GLOVES $34.99 ✦ PREMIUM SKI MITTENS $34.99 ✦ TOUCHSCREEN GLOVES $9.99</span>
+      <span class="ticker-sep">✦✦✦</span>
+    </div>
+  </div>
+</div>
+
+<!-- GRAB POPUP -->
+<div id="overlay">
+  <div id="popup">
+    <div id="popup-icon">🛒</div>
+    <div id="popup-title">GRABBED!</div>
+    <div id="popup-msg"></div>
+  </div>
+</div>
+
+<!-- BAROMETER -->
+<div id="barometer-wrap">
+  <div class="baro">
+    <div class="baro-label" id="baro-label">Cards</div>
+    <div class="baro-count" id="baro-count">0</div>
+  </div>
+</div>
+
+<!-- CELEBRATE -->
+<div id="celebrate"></div>
+
+<!-- GAME OVER -->
+<div id="gameover">
+  <div id="gameover-box">
+    <div id="gameover-title">GAME OVER</div>
+    <div id="gameover-msg"></div>
+    <button id="gameover-replay" onclick="location.reload()">PLAY AGAIN</button>
+  </div>
+</div>
+
+<!-- OPPONENT LEFT -->
+<div id="opp-left">
+  <div id="opp-left-box">
+    <div style="font-size:32px;margin-bottom:8px">😕</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--blue);letter-spacing:2px;">OPPONENT LEFT</div>
+    <div style="font-size:13px;color:#888;margin:8px 0 16px;">The game has ended</div>
+    <button class="lobby-btn" onclick="location.reload()">NEW GAME</button>
+  </div>
+</div>
+
+<script>
+// ─── PRODUCT MAP ────────────────────────────────────────────────
+const PRODUCT_MAP = {
+  bega:       { name:'Mac & Cheese',    img:'cards/begamacandcheese-card.png' },
+  blackstone: { name:'Sea Salt Chips',  img:'cards/blackstonechips-card.png' },
+  chicken:    { name:'Whole Chicken',   img:'cards/broadoakchicken-card.png' },
+  cottage:    { name:'Cottage Cheese',  img:'cards/cottagecheese-card.png' },
+  disan:      { name:'Laundry Soaker',  img:'cards/disanprooxysoaker-card.png' },
+  eltora:     { name:'Fajita Kit',      img:'cards/eltorafajitakit-card.png' },
+  hillcrest:  { name:'Choco Rice',      img:'cards/hillcrestchocorice-card.png' },
+  trimat:     { name:'Laundry Powder',  img:'cards/trimatlaundrypowder-card.png' },
+  tricare:    { name:'Antibac Soap',    img:'cards/tricaresoap-card.png' },
+  berg:       { name:'Deli Selections', img:'cards/bergdeliselections-card.png' },
+  wisdom:     { name:'Toothbrush',      img:'cards/wisdomtoothbrush-card.png' },
+  bebeto:     { name:'Love Gummies',    img:'cards/bebetogummies-card.png' },
+  colway:     { name:'Worcester Sauce', img:'cards/colwayworcestershire-card.png' },
+};
+
+// ─── STATE ──────────────────────────────────────────────────────
+let socket;
+let mySocketId    = null;
+let myName        = 'You';
+let oppNameVal    = 'Opponent';
+let myHandCount   = 26;  // count only — server owns the actual cards
+let oppCount      = 26;
+let pile          = [];  // local pile for display only
+let isMyTurn      = false;
+let animating     = false;
+let roomId        = null;
+let reshuffleDone = false;
+let reshuffleTimer   = null;
+let reshuffleSeconds = 5;
+
+// ─── DOM ────────────────────────────────────────────────────────
+const playerCountEl = document.getElementById('player-count');
+const oppCountEl    = document.getElementById('opp-count');
+const playerNameEl  = document.getElementById('player-name');
+const oppNameEl     = document.getElementById('opp-name');
+const pileCountEl   = document.getElementById('pile-count');
+const pileArea      = document.getElementById('pile-area');
+const emptyPile     = document.getElementById('empty-pile');
+const btnFlip       = document.getElementById('btn-flip');
+const overlay       = document.getElementById('overlay');
+const popupIcon     = document.getElementById('popup-icon');
+const popupTitle    = document.getElementById('popup-title');
+const popupMsg      = document.getElementById('popup-msg');
+const baroWrap      = document.getElementById('barometer-wrap');
+const baroCount     = document.getElementById('baro-count');
+const baroLabel     = document.getElementById('baro-label');
+const celebrate     = document.getElementById('celebrate');
+const playerStack   = document.getElementById('player-stack');
+const oppStack      = document.getElementById('opp-stack');
+
+// ─── AUDIO ──────────────────────────────────────────────────────
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let actx;
+function getACtx(){ if(!actx) actx = new AudioCtx(); return actx; }
+
+function playCardSlide(){
+  try {
+    const ctx = getACtx();
+    const buf = ctx.createBuffer(1, ctx.sampleRate*0.18, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for(let i=0;i<d.length;i++){ const t=i/ctx.sampleRate; d[i]=(Math.random()*2-1)*Math.exp(-t*28)*0.55; }
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const filt = ctx.createBiquadFilter(); filt.type='bandpass'; filt.frequency.value=1800; filt.Q.value=0.8;
+    src.connect(filt); filt.connect(ctx.destination); src.start();
+  } catch(e){}
+}
+
+function playGrabSound(){
+  try {
+    const ctx = getACtx();
+    [220,330,440,550,660].forEach((freq,i)=>{
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.frequency.value=freq; osc.type='square';
+      gain.gain.setValueAtTime(0.15, ctx.currentTime+i*0.06);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+i*0.06+0.25);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(ctx.currentTime+i*0.06); osc.stop(ctx.currentTime+i*0.06+0.25);
+    });
+  } catch(e){}
+}
+
+function playFalseGrab(){
+  try {
+    const ctx = getACtx();
+    const osc = ctx.createOscillator(); const gain = ctx.createGain();
+    osc.frequency.setValueAtTime(300, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime+0.4);
+    osc.type='sawtooth';
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.5);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime+0.5);
+  } catch(e){}
+}
+
+// ─── UI HELPERS ─────────────────────────────────────────────────
+function updateUI(){
+  playerCountEl.textContent = myHandCount;
+  oppCountEl.textContent    = oppCount;
+  pileCountEl.textContent   = pile.length > 0 ? pile.length : '';
+  btnFlip.disabled = !isMyTurn || animating;
+}
+
+function bumpPileCount(){
+  pileCountEl.classList.remove('bump');
+  void pileCountEl.offsetWidth;
+  pileCountEl.classList.add('bump');
+  setTimeout(()=>pileCountEl.classList.remove('bump'), 300);
+}
+
+function cardImgHTML(productId){
+  const p = PRODUCT_MAP[productId];
+  if(!p) return '';
+  return `<img class="card-front-img" src="${p.img}" alt="${p.name}">`;
+}
+
+function renderPile(){
+  pileArea.querySelectorAll('.pile-card').forEach(c=>c.remove());
+  if(!pile.length){ emptyPile.style.display='flex'; return; }
+  emptyPile.style.display='none';
+  const show = Math.min(pile.length, 4);
+  for(let i=0; i<show; i++){
+    const isTop = i===show-1;
+    const card = document.createElement('div');
+    card.className = 'pile-card';
+    const off = (show-1-i);
+    card.style.top  = (off*2.5)+'px';
+    card.style.left = (off*1.5)+'px';
+    card.style.zIndex = i;
+    if(isTop){
+      card.innerHTML = cardImgHTML(pile[pile.length-1]);
+    } else {
+      card.style.background = '#003087';
+      card.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center"><img class="card-back-img" src="grab.png" alt="GRAB"></div>`;
+    }
+    pileArea.appendChild(card);
+  }
+}
+
+// ─── CARD FLIGHT ────────────────────────────────────────────────
+function flyCard(productId, fromEl, callback){
+  const fr = fromEl.getBoundingClientRect();
+  const to = pileArea.getBoundingClientRect();
+
+  const el = document.createElement('div');
+  el.className = 'flying';
+  el.style.left = fr.left + (fr.width-76)/2 + 'px';
+  el.style.top  = fr.top  + (fr.height-106)/2 + 'px';
+  el.innerHTML  = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center"><img class="card-back-img" src="grab.png" alt="GRAB"></div>`;
+  document.body.appendChild(el);
+
+  const destX = to.left + (to.width-76)/2;
+  const destY = to.top  + (to.height-106)/2;
+  const rot   = (Math.random()-0.5)*16;
+
+  playCardSlide();
+
+  requestAnimationFrame(()=>{
+    el.style.transition = 'left 0.22s cubic-bezier(0.22,1,0.36,1), top 0.22s cubic-bezier(0.22,1,0.36,1), transform 0.22s ease';
+    el.style.left = destX+'px';
+    el.style.top  = destY+'px';
+    el.style.transform = `rotate(${rot}deg)`;
+  });
+
+  setTimeout(()=>{
+    el.style.transition='transform 0.14s ease';
+    el.style.transform = `rotate(${rot}deg) rotateY(90deg)`;
+    setTimeout(()=>{
+      el.style.background='white';
+      const img = document.createElement('img');
+      img.className = 'card-front-img';
+      img.src = PRODUCT_MAP[productId]?.img || '';
+      img.style.transform = 'rotateY(-90deg)';
+      img.style.transition = 'transform 0.14s ease';
+      el.innerHTML = '';
+      el.appendChild(img);
+      requestAnimationFrame(()=>{ img.style.transform='rotateY(0deg)'; });
+      setTimeout(()=>{ document.body.removeChild(el); callback(); }, 150);
+    },140);
+  },230);
+}
+
+// ─── CASCADE ────────────────────────────────────────────────────
+function cascadePile(toStack, pileSize, callback){
+  let i = 0;
+  function next(){
+    if(i >= pileSize){ callback(); return; }
+    i++;
+    const fr = pileArea.getBoundingClientRect();
+    const to = toStack.getBoundingClientRect();
+    const el = document.createElement('div');
+    el.className = 'flying';
+    el.style.left = fr.left + (fr.width-76)/2 + 'px';
+    el.style.top  = fr.top  + (fr.height-106)/2 + 'px';
+    el.style.background = '#003087';
+    el.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center"><img class="card-back-img" src="grab.png" alt="GRAB"></div>`;
+    document.body.appendChild(el);
+    const destX = to.left + (to.width-76)/2 + (Math.random()-0.5)*10;
+    const destY = to.top  + (to.height-106)/2;
+    const rot   = (Math.random()-0.5)*20;
+    requestAnimationFrame(()=>{
+      el.style.transition = 'left 0.2s ease, top 0.2s ease, transform 0.2s ease';
+      el.style.left = destX+'px'; el.style.top = destY+'px';
+      el.style.transform = `rotate(${rot}deg) scale(0.85)`;
+    });
+    setTimeout(()=>{ document.body.removeChild(el); }, 220);
+    setTimeout(next, 55);
+  }
+  next();
+}
+
+// ─── GRAB RESOLUTION ────────────────────────────────────────────
+function resolveGrab(grabbedBy, grabberName, isMatch, pileSize, newTurn){
+  animating = true;
+  btnFlip.disabled = true;
+
+  const iWon    = isMatch ? (grabbedBy === mySocketId) : (grabbedBy !== mySocketId);
+  const toStack = iWon ? playerStack : oppStack;
+
+  if(isMatch){ playGrabSound(); showCelebration(); }
+  else { playFalseGrab(); }
+
+  popupIcon.textContent  = isMatch ? '🛒' : '😬';
+  popupTitle.textContent = isMatch ? 'GRABBED!' : 'FALSE GRAB!';
+  popupMsg.textContent   = isMatch
+    ? `${grabberName} was too fast on that one`
+    : `${grabberName} got too jumpy on that one`;
+
+  overlay.classList.add('show');
+
+  setTimeout(()=>{
+    overlay.classList.remove('show');
+    pile = [];
+    renderPile();
+
+    cascadePile(toStack, pileSize, ()=>{
+      updateUI();
+      const winnerCount = iWon ? myHandCount : oppCount;
+      showBarometer(iWon, pileSize, winnerCount, newTurn);
+    });
+  }, 2000);
+}
+
+function showBarometer(iWon, pileSize, finalCount, newTurn){
+  const label = iWon ? myName : oppNameVal;
+  baroLabel.textContent = label + ' now has';
+  baroCount.className   = 'baro-count ' + (iWon ? 'win-color' : 'lose-color');
+  const startCount = Math.max(0, finalCount - pileSize);
+  baroCount.textContent = startCount;
+  baroWrap.classList.add('show');
+  let current = startCount;
+  const step  = Math.ceil(pileSize/18);
+  const timer = setInterval(()=>{
+    current = Math.min(current+step, finalCount);
+    baroCount.textContent = current;
+    if(current >= finalCount) clearInterval(timer);
+  }, 60);
+  setTimeout(()=>{
+    baroWrap.classList.remove('show');
+    // Set turn HERE — only after all animations done
+    isMyTurn  = newTurn === mySocketId;
+    animating = false;
+    updateUI();
+  }, 2200);
+}
+
+function showCelebration(){
+  celebrate.innerHTML=''; celebrate.classList.add('show');
+  const colors=['#e30613','#003087','#ffd700','#ff6200','#00aa44'];
+  for(let i=0;i<60;i++){
+    const c=document.createElement('div'); c.className='confetti';
+    c.style.left=Math.random()*100+'vw'; c.style.top='-10px';
+    c.style.background=colors[Math.floor(Math.random()*colors.length)];
+    c.style.width=(8+Math.random()*8)+'px'; c.style.height=(8+Math.random()*8)+'px';
+    c.style.animationDelay=Math.random()*0.6+'s';
+    c.style.animationDuration=(0.8+Math.random()*0.8)+'s';
+    celebrate.appendChild(c);
+  }
+  setTimeout(()=>{ celebrate.classList.remove('show'); celebrate.innerHTML=''; }, 2000);
+}
+
+// ─── GAME ACTIONS ───────────────────────────────────────────────
+function doFlip(){
+  if(!isMyTurn || animating || myHandCount === 0) return;
+  animating = true;
+  btnFlip.disabled = true;
+  socket.emit('flip');
+}
+
+function doGrab(){
+  if(animating) return;
+  socket.emit('grab');
+}
+
+// ─── SOCKET.IO ──────────────────────────────────────────────────
+function connectSocket(){
+  socket = io();
+
+  socket.on('game_ready', (data)=>{
+    mySocketId   = data.mySocketId;
+    myName       = data.myName;
+    oppNameVal   = data.oppName;
+    myHandCount  = data.handCount;
+    oppCount     = data.oppCount;
+    isMyTurn     = data.turn === mySocketId;
+
+    playerNameEl.textContent = myName;
+    oppNameEl.textContent    = oppNameVal;
+
+    document.getElementById('lobby').style.display = 'none';
+    document.getElementById('waiting-screen').classList.remove('show');
+    showReshuffleScreen();
+  });
+
+  socket.on('reshuffled', (data)=>{
+    myHandCount = data.handCount;
+    oppCount    = data.oppCount;
+    document.getElementById('reshuffle-msg').textContent = data.by + ' shuffled the deck!';
+    document.getElementById('reshuffle-btn').style.display = 'none';
+    document.getElementById('shuffling-label').style.display = 'block';
+    animateRiffle(()=>{});
+  });
+
+  socket.on('game_start', (data)=>{
+    isMyTurn = data.turn === mySocketId;
+    document.getElementById('reshuffle-screen').style.display = 'none';
+    updateUI();
+    renderPile();
+  });
+
+  socket.on('card_flipped', (data)=>{
+    const byMe = data.by === mySocketId;
+    pile.push(data.card);
+
+    // Update counts from server truth immediately
+    if(data.handCounts){
+      myHandCount = data.handCounts[mySocketId] ?? myHandCount;
+      oppCount    = data.handCounts[Object.keys(data.handCounts).find(k=>k!==mySocketId)] ?? oppCount;
+    }
+
+    const fromStack = byMe ? playerStack : oppStack;
+    flyCard(data.card, fromStack, ()=>{
+      renderPile();
+      bumpPileCount();
+      // Set turn from server after animation completes
+      isMyTurn  = data.newTurn === mySocketId;
+      animating = false;
+      updateUI();
+    });
+  });
+
+  socket.on('grab_result', (data)=>{
+    // Update counts from server truth
+    if(data.handCounts){
+      myHandCount = data.handCounts[mySocketId] ?? myHandCount;
+      oppCount    = data.handCounts[Object.keys(data.handCounts).find(k=>k!==mySocketId)] ?? oppCount;
+    }
+    // newTurn set AFTER barometer finishes inside resolveGrab
+    resolveGrab(data.grabbedBy, data.grabberName, data.isMatch, data.pileSize, data.newTurn);
+  });
+
+  socket.on('game_over', (data)=>{
+    const won = data.winner === myName;
+    document.getElementById('gameover-msg').textContent = won ? '🏆 You collected all the cards!' : oppNameVal + ' collected all the cards';
+    document.getElementById('gameover').classList.add('show');
+  });
+
+  socket.on('opponent_left', ()=>{
+    document.getElementById('opp-left').classList.add('show');
+  });
+}
+
+// ─── LOBBY ──────────────────────────────────────────────────────
+function startChallenge(){
+  const name = document.getElementById('name-input').value.trim();
+  if(!name){ document.getElementById('name-input').focus(); return; }
+  myName = name;
+  playerNameEl.textContent = name;
+
+  connectSocket();
+
+  // Create room on server
+  socket.emit('create_room', { name }, (res)=>{
+    roomId = res.roomId;
+    const link = window.location.origin + window.location.pathname + '?room=' + roomId;
+
+    // Open native share sheet immediately
+    if(navigator.share){
+      navigator.share({ title:'GRAB', text: myName + ' is challenging you to GRAB!', url: link });
+    } else {
+      navigator.clipboard.writeText(link);
+    }
+
+    // Show waiting state
+    document.getElementById('challenge-btn').style.display = 'none';
+    document.getElementById('name-input').style.display = 'none';
+    document.getElementById('lobby-status').textContent = 'Waiting for opponent to join...';
+  });
+}
+
+function joinGame(){
+  const name = document.getElementById('name-input').value.trim();
+  if(!name){ document.getElementById('name-input').focus(); return; }
+  myName = name;
+  playerNameEl.textContent = name;
+
+  connectSocket();
+
+  const params = new URLSearchParams(window.location.search);
+  const joinRoom = params.get('room');
+
+  socket.emit('join_room', { roomId: joinRoom, name }, (res)=>{
+    if(res.error){
+      document.getElementById('lobby-status').textContent = res.error;
+      return;
+    }
+    document.getElementById('lobby').style.display = 'none';
+  });
+}
+
+// ─── RESHUFFLE SCREEN ───────────────────────────────────────────
+function showReshuffleScreen(){
+  const screen = document.getElementById('reshuffle-screen');
+  screen.style.display = 'flex';
+  buildDeckStage();
+  startReshuffleCountdown();
+}
+
+function buildDeckStage(){
+  const stage = document.getElementById('deck-stage');
+  stage.innerHTML = '';
+  const total = 8;
+  for(let i=0;i<total;i++){
+    const card = document.createElement('div');
+    card.className = 'deck-card';
+    card.id = 'dc-'+i;
+    card.innerHTML = '<img style="width:52px;height:72px;border-radius:7px;object-fit:cover;" src="grab.png" alt="GRAB">';
+    const angle  = -20 + (i/(total-1))*40;
+    const offsetX = 64 + (i/(total-1))*52;
+    card.style.left      = offsetX+'px';
+    card.style.top       = '24px';
+    card.style.transform = 'rotate('+angle+'deg)';
+    card.style.zIndex    = i;
+    stage.appendChild(card);
+  }
+}
+
+function startReshuffleCountdown(){
+  reshuffleSeconds = 5;
+  reshuffleDone    = false;
+  updateCountdownArc(5);
+  document.getElementById('countdown-num').textContent = '5';
+  reshuffleTimer = setInterval(()=>{
+    reshuffleSeconds--;
+    document.getElementById('countdown-num').textContent = reshuffleSeconds;
+    updateCountdownArc(reshuffleSeconds);
+    if(reshuffleSeconds <= 0){
+      clearInterval(reshuffleTimer);
+      socket.emit('start_game');
+    }
+  }, 1000);
+}
+
+function updateCountdownArc(secs){
+  const arc = document.getElementById('countdown-arc');
+  arc.style.strokeDashoffset = 188.5 * (1 - secs/5);
+  arc.style.stroke = secs <= 2 ? '#e30613' : '#003087';
+}
+
+function doReshuffle(){
+  if(reshuffleDone) return;
+  reshuffleDone = true;
+  clearInterval(reshuffleTimer);
+  const btn = document.getElementById('reshuffle-btn');
+  btn.disabled = true; btn.style.opacity='0.4';
+  document.getElementById('shuffling-label').style.display='block';
+  document.getElementById('countdown-ring').style.display='none';
+  document.getElementById('reshuffle-msg').textContent='Reshuffling the deck...';
+  socket.emit('reshuffle');
+  animateRiffle(()=>{ setTimeout(()=>{ socket.emit('start_game'); }, 400); });
+}
+
+function animateRiffle(callback){
+  const stage = document.getElementById('deck-stage');
+  const cards = stage.querySelectorAll('.deck-card');
+  const total = cards.length;
+  cards.forEach((c,i)=>{
+    c.style.transition='transform 0.25s ease, left 0.25s ease';
+    c.style.transform = i < total/2 ? 'translateX(-22px) rotate(-22deg)' : 'translateX(22px) rotate(22deg)';
+  });
+  setTimeout(()=>{
+    cards.forEach((c,i)=>{
+      const delay = i*45;
+      const rot   = (Math.random()-0.5)*30;
+      setTimeout(()=>{
+        c.style.transition='transform 0.3s cubic-bezier(0.22,1,0.36,1), left 0.3s ease';
+        c.style.setProperty('--fly-rot', rot+'deg');
+        c.style.animation='shuffle-fly 0.35s ease forwards';
+        c.style.transform='rotate(0deg)';
+        c.style.left = 64+(i/(total-1))*52+'px';
+      }, delay);
+    });
+  }, 300);
+  setTimeout(()=>{
+    cards.forEach((c,i)=>{
+      c.style.transition='transform 0.3s ease, left 0.3s ease';
+      c.style.animation='none';
+      c.style.transform='rotate('+(i-total/2)*1.5+'deg)';
+      c.style.left=(80+(i-total/2)*3)+'px';
+    });
+    setTimeout(callback, 400);
+  }, 300+total*45+400);
+}
+
+// On load — if joining via link, show JOIN GAME instead
+(function(){
+  const params = new URLSearchParams(window.location.search);
+  if(params.get('room')){
+    document.getElementById('challenge-btn').style.display = 'none';
+    document.getElementById('join-btn').style.display = 'block';
+    document.getElementById('lobby-sub').textContent = "You've been challenged!";
+  }
+})();
+
+updateUI();
+renderPile();
+</script>
+</body>
+</html>
