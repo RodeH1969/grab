@@ -54,8 +54,16 @@ function createRoom(){
 function dealHands(room){
   const d = [...room.deck];
   const p = room.players;
-  room.hands[p[0].socketId] = d.slice(0,26);
-  room.hands[p[1].socketId] = d.slice(26,52);
+  // Deal alternating cards so pile plays in true deck order
+  // p0 gets cards 0,2,4,6... p1 gets 1,3,5,7...
+  // When they alternate flipping the pile sequence is deck[0],deck[1],deck[2]...
+  const h0 = [], h1 = [];
+  for(let i=0;i<d.length;i++){
+    if(i%2===0) h0.push(d[i]);
+    else h1.push(d[i]);
+  }
+  room.hands[p[0].socketId] = h0;
+  room.hands[p[1].socketId] = h1;
 }
 
 function getOther(room, socketId){
@@ -177,6 +185,31 @@ io.on('connection', (socket) => {
       },
       newTurn: room.turn,
     });
+
+    // Check if both hands empty — reshuffle and redeal
+    const p0 = room.players[0], p1 = room.players[1];
+    if(room.hands[p0.socketId].length === 0 && room.hands[p1.socketId].length === 0 && room.pile.length === 0){
+      // Full deck exhausted with no match — reshuffle everything
+      room.deck = buildDeck();
+      dealHands(room);
+      room.turn = room.players[0].socketId;
+      io.to(socket.roomId).emit('deck_empty');
+      // After short delay send new hand counts
+      setTimeout(()=>{
+        io.to(p0.socketId).emit('new_deal', {
+          handCount: room.hands[p0.socketId].length,
+          oppCount:  room.hands[p1.socketId].length,
+          turn:      room.turn,
+          mySocketId: p0.socketId,
+        });
+        io.to(p1.socketId).emit('new_deal', {
+          handCount: room.hands[p1.socketId].length,
+          oppCount:  room.hands[p0.socketId].length,
+          turn:      room.turn,
+          mySocketId: p1.socketId,
+        });
+      }, 3200);
+    }
 
     if(cb) cb({ ok: true });
   });
