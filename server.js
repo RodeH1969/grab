@@ -218,9 +218,14 @@ io.on('connection', (socket) => {
     const isMatch = room.pile.length >= 2 &&
                     room.pile[room.pile.length-1] === room.pile[room.pile.length-2];
 
-    // Switch turn to other player BEFORE emitting
+    // Switch turn to other player
     const other = getOther(room, socket.id);
     if(other) room.turn = other.socketId;
+
+    // If next player has no cards, skip back to current player immediately
+    if(other && room.hands[other.socketId].length === 0){
+      room.turn = socket.id;
+    }
 
     io.to(socket.roomId).emit('card_flipped', {
       by:       socket.id,
@@ -280,6 +285,10 @@ io.on('connection', (socket) => {
     const pileCards = [...room.pile];
     room.pile = [];
 
+    // Snapshot hand sizes BEFORE adding pile cards — for win condition check
+    const grabberCountBefore = room.hands[grabber.socketId].length;
+    const otherCountBefore   = room.hands[other.socketId].length;
+
     if(isMatch){
       // Correct grab — grabber wins pile, grabber flips next
       room.hands[grabber.socketId] = room.hands[grabber.socketId].concat(pileCards);
@@ -306,19 +315,17 @@ io.on('connection', (socket) => {
     const p1 = room.players[1];
     const p0Hand = room.hands[p0.socketId];
     const p1Hand = room.hands[p1.socketId];
-    const grabberHand  = room.hands[grabber.socketId];
-    const otherHand    = room.hands[other.socketId];
 
     if(isMatch){
-      // Correct grab — check if loser now has zero cards
-      if(otherHand.length === 0){
+      // Game over only if loser had zero cards BEFORE the grab
+      // (they had no hand cards and just lost the pile too)
+      if(otherCountBefore === 0){
         io.to(socket.roomId).emit('game_over', { winner: grabber.name });
         return;
       }
     } else {
-      // False grab — check if grabber had zero cards = instant game over
-      // grabberHand already had pile added to other, so check if grabber has zero
-      if(grabberHand.length === 0){
+      // False grab — game over only if grabber had zero cards before grab
+      if(grabberCountBefore === 0){
         io.to(socket.roomId).emit('game_over', { winner: other.name });
         return;
       }
